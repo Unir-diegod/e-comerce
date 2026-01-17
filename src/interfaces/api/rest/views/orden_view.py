@@ -17,8 +17,26 @@ from ..serializers.orden_serializer import (
     AgregarLineaOrdenSerializer,
     OrdenSerializer
 )
+from interfaces.permissions import EsOperadorOAdmin
+from interfaces.api.rest.throttling import (
+    OrdenCreacionRateThrottle,
+    OrdenConfirmacionRateThrottle
+)
+
 
 class OrdenListCreateView(APIView):
+    """
+    Endpoint de Órdenes
+    
+    Permisos:
+    - POST: OPERADOR o ADMIN (operación crítica de negocio)
+    
+    Protección Anti-Abuso:
+    - Rate limit: 20 órdenes/minuto por usuario
+    """
+    permission_classes = [EsOperadorOAdmin]
+    throttle_classes = [OrdenCreacionRateThrottle]
+    
     def post(self, request):
         serializer = CrearOrdenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -34,7 +52,20 @@ class OrdenListCreateView(APIView):
         serializer = OrdenSerializer(resultado)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+
 class OrdenLineaView(APIView):
+    """
+    Endpoint para agregar líneas a una orden
+    
+    Permisos:
+    - POST: OPERADOR o ADMIN
+    
+    Protección Anti-Abuso:
+    - Rate limit: 20 operaciones/minuto por usuario
+    """
+    permission_classes = [EsOperadorOAdmin]
+    throttle_classes = [OrdenCreacionRateThrottle]
+    
     def post(self, request, id: UUID):
         serializer = AgregarLineaOrdenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -50,7 +81,21 @@ class OrdenLineaView(APIView):
         serializer = OrdenSerializer(resultado)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+
 class OrdenConfirmarView(APIView):
+    """
+    Endpoint para confirmar una orden (operación crítica)
+    
+    Permisos:
+    - POST: OPERADOR o ADMIN
+    
+    Protección Anti-Abuso:
+    - Rate limit: 10 confirmaciones/minuto por usuario
+    - Operación sensible que afecta inventario y genera transacciones
+    """
+    permission_classes = [EsOperadorOAdmin]
+    throttle_classes = [OrdenConfirmacionRateThrottle]
+    
     def post(self, request, id: UUID):
         repo_orden = OrdenRepositoryImpl()
         repo_producto = ProductoRepositoryImpl()

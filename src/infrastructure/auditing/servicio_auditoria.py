@@ -144,3 +144,53 @@ class ServicioAuditoria:
             )
         
         return registro
+    
+    @staticmethod
+    def registrar_acceso_api(
+        usuario_id: Optional[str],
+        endpoint: str,
+        metodo: str,
+        ip: str,
+        user_agent: str,
+        resultado_exitoso: bool,
+        codigo_estado: Optional[int] = None
+    ):
+        """
+        Registra accesos a la API REST (autenticación y endpoints protegidos)
+        
+        Args:
+            usuario_id: ID del usuario autenticado (None si no autenticado)
+            endpoint: Path del endpoint (/api/v1/productos)
+            metodo: Método HTTP (GET, POST, etc.)
+            ip: Dirección IP del cliente
+            user_agent: User-Agent del cliente
+            resultado_exitoso: Si el acceso fue exitoso
+            codigo_estado: Código HTTP de respuesta
+        """
+        from infrastructure.logging.logger_service import LoggerService
+        logger = LoggerService("AuditoriaAPI")
+        
+        try:
+            from infrastructure.persistence.django.models import AuditoriaAccesoAPI
+            
+            AuditoriaAccesoAPI.objects.create(
+                usuario_id=usuario_id,
+                endpoint=endpoint,
+                metodo=metodo,
+                ip_address=ip,
+                user_agent=user_agent,
+                resultado_exitoso=resultado_exitoso,
+                codigo_estado=codigo_estado
+            )
+            
+            logger.info(
+                f"Acceso API registrado: {metodo} {endpoint} - "
+                f"Usuario: {usuario_id or 'Anónimo'} - "
+                f"IP: {ip} - "
+                f"Estado: {codigo_estado}"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error al registrar acceso API: {e}")
+            # Fail-safe: no interrumpir la operación principal
+            pass

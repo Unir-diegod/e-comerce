@@ -246,18 +246,24 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',  # Django REST Framework
+    'rest_framework_simplejwt',  # JWT Authentication
+    'rest_framework_simplejwt.token_blacklist',  # Blacklist para logout
     'infrastructure.persistence.django',
+    'infrastructure.auth',  # Sistema de autenticación y autorización
     'infrastructure',  # Para los management commands
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'interfaces.api.rest.middleware.RateLimitMiddleware',  # Protección anti-abuso (ANTES de auth)
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'infrastructure.auth.middleware.AuditoriaAutenticacionMiddleware',  # Auditoría de accesos
+    'interfaces.api.rest.middleware.SecurityHeadersMiddleware',  # Headers de seguridad adicionales
 ]
 
 ROOT_URLCONF = 'infrastructure.config.django_urls'
@@ -319,6 +325,11 @@ STATIC_URL = 'static/'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ============================================================================
+# CUSTOM USER MODEL
+# ============================================================================
+AUTH_USER_MODEL = 'ecommerce_auth.Usuario'
 
 # ============================================================================
 # LOGGING CONFIGURATION (SEGURO)
@@ -396,9 +407,85 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.JSONParser',
     ],
     'DEFAULT_PAGINATION_CLASS': None,  # Sin paginación por defecto
-    'UNAUTHENTICATED_USER': None,  # Sin autenticación por ahora
-    'UNAUTHENTICATED_TOKEN': None,
+    
+    # Autenticación JWT
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    
+    # Permisos por defecto: requiere autenticación
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    
+    # =========================================================================
+    # RATE LIMITING / THROTTLING (Protección Anti-Abuso)
+    # =========================================================================
+    # Clases de throttling aplicadas globalmente a todos los endpoints
+    'DEFAULT_THROTTLE_CLASSES': [
+        'interfaces.api.rest.throttling.GlobalAnonRateThrottle',
+        'interfaces.api.rest.throttling.GlobalUserRateThrottle',
+    ],
+    
+    # Configuración de rates por scope
+    # Formato: 'scope': 'num_requests/period'
+    # Periods válidos: second, minute, hour, day
+    'DEFAULT_THROTTLE_RATES': {
+        # Throttling global
+        'anon_global': '50/minute',      # Anónimos: 50 req/min
+        'user_global': '200/minute',     # Autenticados: 200 req/min
+        
+        # Throttling por endpoint crítico
+        'login': '5/minute',             # Login: 5 intentos/min
+        'token_refresh': '10/minute',    # Refresh: 10/min
+        'orden_creacion': '20/minute',   # Crear órdenes: 20/min
+        'orden_confirmacion': '10/minute', # Confirmar órdenes: 10/min
+    },
 }
+
+# ============================================================================
+# JWT CONFIGURATION (SimpleJWT)
+# ============================================================================
+from infrastructure.config.jwt_config import SIMPLE_JWT
+
+# ============================================================================
+# RATE LIMITING / BLOQUEO TEMPORAL CONFIGURATION
+# ============================================================================
+# Configuración de protección anti-abuso
+
+# Máximo de intentos fallidos antes de bloqueo temporal
+SECURITY_MAX_FAILED_ATTEMPTS = int(os.environ.get('SECURITY_MAX_FAILED_ATTEMPTS', 5))
+
+# Duración del bloqueo en segundos (default: 15 minutos = 900 segundos)
+SECURITY_BLOCK_DURATION = int(os.environ.get('SECURITY_BLOCK_DURATION', 900))
+
+# Ventana de tiempo para contar intentos fallidos (default: 5 minutos = 300 segundos)
+SECURITY_ATTEMPT_WINDOW = int(os.environ.get('SECURITY_ATTEMPT_WINDOW', 300))
+
+# ============================================================================
+# CACHE CONFIGURATION (Requerido para Rate Limiting)
+# ============================================================================
+# En producción, usar Redis o Memcached para mejor rendimiento
+# El cache por defecto de Django es local-memory (suficiente para desarrollo)
+
+CACHES = {
+    'default': {
+        # En desarrollo: cache en memoria
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache' if IS_DEVELOPMENT else 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'rate-limiting-cache',
+        'OPTIONS': {
+            'MAX_ENTRIES': 10000,  # Máximo de entradas en cache
+        }
+    }
+}
+
+# NOTA: Para producción con múltiples instancias, configurar Redis:
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+#         'LOCATION': os.environ.get('REDIS_URL', 'redis://localhost:6379/1'),
+#     }
+# }
 
 # ============================================================================
 # SECURITY CHECKS (VALIDACIÓN AL ARRANQUE)
@@ -415,4 +502,5 @@ if not os.environ.get('DJANGO_SETTINGS_SUPPRESS_INFO'):
     print(f"SSL Redirect: {SECURE_SSL_REDIRECT}")
     print(f"Secure Cookies: {SESSION_COOKIE_SECURE}")
     print(f"HSTS Enabled: {SECURE_HSTS_SECONDS > 0}")
+    print(f"JWT Enabled: True (Access: 15min, Refresh: 1day)")
     print("=" * 70)

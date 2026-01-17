@@ -13,8 +13,18 @@ from ..serializers.producto_serializer import (
     CrearProductoSerializer,
     ProductoSerializer
 )
+from interfaces.permissions import PermisosPorMetodo
 
 class ProductoListCreateView(APIView):
+    """
+    Endpoint de Productos
+    
+    Permisos:
+    - GET: Cualquier usuario autenticado
+    - POST: OPERADOR o ADMIN
+    """
+    permission_classes = [PermisosPorMetodo]
+    
     def get(self, request):
         repo = ProductoRepositoryImpl()
         use_case = ListarProductosUseCase(repo)
@@ -38,6 +48,14 @@ class ProductoListCreateView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class ProductoDetailView(APIView):
+    """
+    Endpoint de detalle de Producto
+    
+    Permisos:
+    - GET: Cualquier usuario autenticado
+    """
+    permission_classes = [PermisosPorMetodo]
+    
     def get(self, request, id: UUID):
         repo = ProductoRepositoryImpl()
         use_case = ObtenerProductoUseCase(repo)

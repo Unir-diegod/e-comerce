@@ -12,8 +12,17 @@ from ..serializers.cliente_serializer import (
     CrearClienteSerializer,
     ClienteSerializer
 )
+from interfaces.permissions import PermisosPorMetodo
 
 class ClienteListCreateView(APIView):
+    """
+    Endpoint de Clientes
+    
+    Permisos:
+    - POST: OPERADOR o ADMIN
+    """
+    permission_classes = [PermisosPorMetodo]
+    
     def post(self, request):
         serializer = CrearClienteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -29,6 +38,14 @@ class ClienteListCreateView(APIView):
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
 class ClienteDetailView(APIView):
+    """
+    Endpoint de detalle de Cliente
+    
+    Permisos:
+    - GET: Cualquier usuario autenticado
+    """
+    permission_classes = [PermisosPorMetodo]
+    
     def get(self, request, id: UUID):
         repo = ClienteRepositoryImpl()
         use_case = ObtenerClienteUseCase(repo)
