@@ -1,346 +1,490 @@
+<div align="center">
+
 # 🏢 Sistema E-Commerce - Clean Architecture
+
+### Arquitectura Empresarial con DDD, CQRS, JWT Auth y Event-Driven Design
 
 [![Python](https://img.shields.io/badge/Python-3.14+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-6.0-092E20?style=flat-square&logo=django&logoColor=white)](https://www.djangoproject.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.1-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![DRF](https://img.shields.io/badge/DRF-3.15-red?style=flat-square)](https://www.django-rest-framework.org/)
-[![JWT](https://img.shields.io/badge/JWT-Auth-orange?style=flat-square)](https://jwt.io/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.128-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![JWT](https://img.shields.io/badge/JWT-Auth-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)](https://jwt.io/)
+[![Architecture](https://img.shields.io/badge/Architecture-Clean-orange.svg?style=flat-square)](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 
-Sistema empresarial de e-commerce implementando **Clean Architecture**, **Domain-Driven Design (DDD)** y patrones empresariales modernos con autenticación JWT y protección anti-abuso.
+</div>
 
 ---
 
-## 📋 Índice
+## 📋 Tabla de Contenidos
 
-- [Arquitectura](#-arquitectura)
+- [Visión General](#-visión-general)
+- [Arquitectura del Sistema](#-arquitectura-del-sistema)
+- [Stack Tecnológico](#-stack-tecnológico)
+- [Estructura del Proyecto](#-estructura-del-proyecto)
 - [Instalación](#-instalación)
 - [Configuración](#-configuración)
+- [Autenticación y Seguridad](#-autenticación-y-seguridad)
 - [API REST](#-api-rest)
-- [Autenticación](#-autenticación)
-- [Dominio](#-capa-de-dominio)
-- [Infraestructura](#-capa-de-infraestructura)
-- [Seguridad](#-seguridad)
+- [Modelado de Dominio](#-modelado-de-dominio)
+- [Base de Datos](#-base-de-datos)
 - [Testing](#-testing)
 
 ---
 
-## 🏗️ Arquitectura
+## 📋 Visión General
 
-### Capas del Sistema
+Sistema e-commerce empresarial implementado con **Clean Architecture** y principios de **Domain-Driven Design (DDD)**. Diseñado para desacoplar completamente la lógica de negocio de la infraestructura tecnológica.
+
+### Características Principales
+
+- ✅ **Clean Architecture**: Separación estricta en capas con inversión de dependencias
+- ✅ **Domain-Driven Design**: Entidades, Value Objects, Agregados y Eventos de Dominio
+- ✅ **CQRS**: Separación de operaciones de lectura y escritura
+- ✅ **Autenticación JWT**: Tokens de acceso con refresh rotativo
+- ✅ **RBAC**: Control de acceso basado en roles (Admin, Operador, Lectura)
+- ✅ **Rate Limiting**: Protección anti-abuso con throttling configurable
+- ✅ **Auditoría**: Registro automático de todos los accesos a la API
+- ✅ **API REST**: Endpoints documentados con OpenAPI/Swagger
+
+---
+
+## 🏗️ Arquitectura del Sistema
+
+La arquitectura está diseñada concéntricamente. Las dependencias fluyen **únicamente hacia adentro**, protegiendo el Dominio de cambios externos.
 
 ```
-┌──────────────────────────────────────────┐
-│  Interfaces (API REST / Django Admin)   │ ← Adaptadores de entrada
-├──────────────────────────────────────────┤
-│  Application (Use Cases / DTOs)          │ ← Orquestación
-├──────────────────────────────────────────┤
-│  Domain (Entities / Value Objects)       │ ← NÚCLEO (Reglas de negocio)
-├──────────────────────────────────────────┤
-│  Infrastructure (ORM / Repos / Auth)     │ ← Adaptadores de salida
-└──────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    📱 INTERFACES LAYER                          │
+│         FastAPI Router │ Django Admin │ CLI Commands            │
+├─────────────────────────────────────────────────────────────────┤
+│                    ⚙️ APPLICATION LAYER                         │
+│           Use Cases │ DTOs │ Commands │ Queries                 │
+├─────────────────────────────────────────────────────────────────┤
+│                    💎 DOMAIN LAYER (Núcleo)                     │
+│    Entities │ Value Objects │ Repository Interfaces │ Events   │
+├─────────────────────────────────────────────────────────────────┤
+│                    🔌 INFRASTRUCTURE LAYER                      │
+│      Django ORM │ PostgreSQL │ JWT │ Auditing │ External APIs   │
+└─────────────────────────────────────────────────────────────────┘
+                              ▲
+                              │
+              Las dependencias fluyen HACIA ADENTRO
 ```
-
-**Regla de Dependencia:** Las capas externas dependen de las internas. El dominio NO depende de nada.
 
 ### Diagrama de Componentes
 
 ```mermaid
 graph TD
-    subgraph Presentation ["📱 Interfaces"]
-        API[REST API]
+    subgraph Presentation ["📱 Capa de Presentación"]
+        API[FastAPI Router]
         Admin[Django Admin]
+        CLI[Comandos CLI]
     end
 
-    subgraph Application ["⚙️ Aplicación"]
+    subgraph Application ["⚙️ Capa de Aplicación"]
         UseCases[Casos de Uso]
-        DTOs[DTOs]
+        DTOs[DTOs / Esquemas]
+        Ports[Puertos / Interfaces]
     end
 
-    subgraph Domain ["💎 Dominio"]
-        Entities[Entidades]
+    subgraph Domain ["💎 Capa de Dominio"]
+        Entities[Entidades y Agregados]
         VO[Value Objects]
-        RepoInt[Interfaces Repositorio]
+        RepoInt[Interfaces de Repositorio]
+        Events[Eventos de Dominio]
     end
 
-    subgraph Infrastructure ["🔌 Infraestructura"]
-        RepoImpl[Repositorios]
+    subgraph Infrastructure ["🔌 Capa de Infraestructura"]
+        RepoImpl[Implementación Repos]
         ORM[Django ORM]
-        Auth[JWT Auth]
-        DB[(PostgreSQL)]
+        Postgres[(PostgreSQL)]
+        JWT[JWT Auth]
     end
 
     Presentation --> Application
     Application --> Domain
     Infrastructure --> Domain
-    RepoImpl --> ORM --> DB
+    
+    RepoImpl -. Implementa .-> RepoInt
+    RepoImpl --> ORM
+    ORM --> Postgres
+    
+    style Domain fill:#fff3e0,stroke:#ff6f00,stroke-width:2px
+    style Application fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style Infrastructure fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style Presentation fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
 ```
 
-### Flujo de Datos (CQRS)
+---
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Client as Cliente
-    participant API as API REST
-    participant UC as Caso de Uso
-    participant Dom as Entidad
-    participant Repo as Repositorio
-    participant DB as PostgreSQL
+## 🛠️ Stack Tecnológico
 
-    Client->>API: POST /clientes
-    API->>UC: Ejecutar(DTO)
-    UC->>Dom: Crear + Validar
-    Dom-->>UC: Entidad Válida
-    UC->>Repo: Guardar
-    Repo->>DB: INSERT
-    DB-->>Repo: OK
-    Repo-->>UC: Entidad
-    UC-->>API: DTO
-    API-->>Client: 201 Created
+| Capa | Tecnología | Rol |
+|------|------------|-----|
+| **Dominio** | Python Puro | Reglas de negocio, Entidades, Value Objects |
+| **Aplicación** | Python | Casos de uso, DTOs, Validaciones |
+| **Infraestructura** | Django 6.0 | ORM, Admin, Migraciones |
+| **API** | FastAPI | Endpoints REST de alto rendimiento |
+| **Auth** | SimpleJWT | Autenticación con tokens JWT |
+| **Base de Datos** | PostgreSQL 18 | Persistencia relacional |
+| **Testing** | PyTest | Pruebas unitarias e integración |
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+e-commerce/
+├── manage.py                 # Entry point Django
+├── requirements.txt          # Dependencias Python
+├── .env                      # Variables de entorno (no versionado)
+│
+├── src/
+│   ├── main.py              # Configuración FastAPI + Django
+│   │
+│   ├── domain/              # 💎 CAPA DE DOMINIO
+│   │   ├── entities/        # Entidades de negocio
+│   │   │   ├── cliente.py
+│   │   │   ├── producto.py
+│   │   │   └── orden.py
+│   │   ├── value_objects/   # Objetos de valor inmutables
+│   │   │   ├── email.py
+│   │   │   ├── dinero.py
+│   │   │   ├── documento_identidad.py
+│   │   │   └── telefono.py
+│   │   ├── repositories/    # Interfaces de repositorio
+│   │   ├── events/          # Eventos de dominio
+│   │   └── exceptions/      # Excepciones de dominio
+│   │
+│   ├── application/         # ⚙️ CAPA DE APLICACIÓN
+│   │   ├── use_cases/       # Casos de uso
+│   │   │   ├── cliente_use_cases.py
+│   │   │   ├── producto_use_cases.py
+│   │   │   └── orden_use_cases.py
+│   │   ├── dto/             # Data Transfer Objects
+│   │   ├── commands/        # Comandos CQRS
+│   │   └── queries/         # Queries CQRS
+│   │
+│   ├── infrastructure/      # 🔌 CAPA DE INFRAESTRUCTURA
+│   │   ├── auth/            # Sistema de autenticación
+│   │   │   ├── models.py    # Usuario con roles
+│   │   │   └── middleware.py
+│   │   ├── persistence/     # Implementación de repositorios
+│   │   │   └── django/
+│   │   │       ├── models.py
+│   │   │       └── migrations/
+│   │   ├── config/          # Configuración Django/JWT
+│   │   └── auditing/        # Sistema de auditoría
+│   │
+│   └── interfaces/          # 📱 CAPA DE INTERFACES
+│       ├── api/rest/
+│       │   ├── views/       # Endpoints FastAPI
+│       │   ├── throttling.py
+│       │   └── middleware.py
+│       └── permissions/     # RBAC
+│           └── rbac.py
+│
+└── scripts/                 # Scripts de utilidad
+    ├── test_api_auth.py
+    └── test_rate_limit.py
 ```
 
 ---
 
 ## 🚀 Instalación
 
-### Requisitos
+### Requisitos Previos
 
 - Python 3.14+
-- PostgreSQL 16+
-- Git
+- PostgreSQL 18+
+- pip o pipenv
 
 ### Pasos
 
 ```bash
-# Clonar
-git clone <repo-url>
+# 1. Clonar repositorio
+git clone https://github.com/Yoiser16/e-comerce.git
 cd e-comerce
 
-# Entorno virtual
+# 2. Crear entorno virtual
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1  # Windows
-source .venv/bin/activate      # Linux/Mac
 
-# Dependencias
+# Windows
+.venv\Scripts\activate
+
+# Linux/Mac
+source .venv/bin/activate
+
+# 3. Instalar dependencias
 pip install -r requirements.txt
+
+# 4. Configurar variables de entorno
+cp .env.example .env
+# Editar .env con credenciales de PostgreSQL
+
+# 5. Ejecutar migraciones
+python manage.py migrate
+
+# 6. Crear usuarios de prueba
+python manage.py crear_usuarios_demo
+
+# 7. Iniciar servidor
+python manage.py runserver
 ```
 
 ---
 
 ## ⚙️ Configuración
 
-### Variables de Entorno
-
-Crear archivo `.env` en la raíz:
+### Variables de Entorno (.env)
 
 ```env
-# Django
-DJANGO_SECRET_KEY=<generar-key-segura>
-DJANGO_DEBUG=True
-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
-DJANGO_ENVIRONMENT=development
-
-# PostgreSQL
-DB_NAME=ecomerce_db
+# Base de Datos
+DB_NAME=ecommerce
 DB_USER=postgres
-DB_PASSWORD=<password>
+DB_PASSWORD=tu_password
 DB_HOST=localhost
 DB_PORT=5432
 
-# JWT (opcional - valores por defecto)
-JWT_ACCESS_TOKEN_LIFETIME_MINUTES=60
-JWT_REFRESH_TOKEN_LIFETIME_DAYS=7
-```
+# Seguridad
+SECRET_KEY=tu-clave-secreta-muy-larga-y-segura
+DEBUG=False
+ALLOWED_HOSTS=localhost,127.0.0.1
 
-**Generar SECRET_KEY:**
-```bash
-python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
-```
-
-### Inicializar BD
-
-```bash
-python manage.py migrate
-python manage.py crear_usuarios_demo  # Usuarios de prueba
-python manage.py runserver
+# Rate Limiting (opcional)
+SECURITY_MAX_FAILED_ATTEMPTS=5
+SECURITY_BLOCK_DURATION=900
+SECURITY_ATTEMPT_WINDOW=300
 ```
 
 ---
 
-## 📡 API REST
+## 🔐 Autenticación y Seguridad
 
-**Base URL:** `http://localhost:8000/api/v1/`
+### Sistema JWT
 
-### Endpoints Públicos
+El sistema implementa autenticación JWT con:
+- **Access Token**: 15 minutos de validez
+- **Refresh Token**: 1 día, rotativo en cada uso
+- **Blacklist**: Tokens invalidados al hacer logout
 
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| POST | `/auth/login/` | Obtener tokens JWT |
-| POST | `/auth/refresh/` | Renovar access token |
+### Roles y Permisos (RBAC)
 
-### Endpoints Protegidos
+| Rol | Lectura | Crear/Modificar | Eliminar |
+|-----|---------|-----------------|----------|
+| **ADMIN** | ✅ | ✅ | ✅ |
+| **OPERADOR** | ✅ | ✅ | ❌ |
+| **LECTURA** | ✅ | ❌ | ❌ |
 
-| Método | Endpoint | Rol Mínimo | Descripción |
-|--------|----------|------------|-------------|
-| GET | `/clientes/` | viewer | Listar clientes |
-| POST | `/clientes/` | operator | Crear cliente |
-| GET | `/productos/` | viewer | Listar productos |
-| POST | `/productos/` | operator | Crear producto |
-| POST | `/ordenes/` | operator | Crear orden |
-| POST | `/ordenes/{id}/confirmar/` | operator | Confirmar orden |
-
-### Ejemplo: Flujo Completo
+### Endpoints de Autenticación
 
 ```bash
-# 1. Login
-curl -X POST http://localhost:8000/api/v1/auth/login/ \
-  -H "Content-Type: application/json" \
-  -d '{"username": "operador", "password": "Operador123!"}'
+# Login
+POST /api/v1/auth/login
+{
+  "email": "admin@ecommerce.com",
+  "password": "Admin123!"
+}
 
-# Respuesta: {"access": "eyJ...", "refresh": "eyJ..."}
+# Respuesta
+{
+  "access": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh": "eyJhbGciOiJIUzI1NiIs...",
+  "user": {
+    "email": "admin@ecommerce.com",
+    "rol": "ADMIN"
+  }
+}
 
-# 2. Crear cliente (con token)
-curl -X POST http://localhost:8000/api/v1/clientes/ \
-  -H "Authorization: Bearer eyJ..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nombre": "Juan",
-    "apellido": "Pérez",
-    "email": "juan@example.com",
-    "tipo_documento": "DNI",
-    "numero_documento": "12345678"
-  }'
+# Refresh Token
+POST /api/v1/auth/refresh
+{ "refresh": "token_actual" }
 
-# 3. Crear producto
-curl -X POST http://localhost:8000/api/v1/productos/ \
-  -H "Authorization: Bearer eyJ..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "codigo": "SKU-001",
-    "nombre": "Laptop",
-    "precio_monto": 1500.00,
-    "stock_actual": 50
-  }'
+# Logout
+POST /api/v1/auth/logout
+Authorization: Bearer <access_token>
+{ "refresh": "refresh_token" }
+
+# Perfil
+GET /api/v1/auth/perfil
+Authorization: Bearer <access_token>
 ```
 
----
+### Usuarios de Prueba
 
-## 🔐 Autenticación
+```bash
+python manage.py crear_usuarios_demo
+```
 
-El sistema usa **JWT (JSON Web Tokens)** con refresh tokens.
+| Email | Password | Rol |
+|-------|----------|-----|
+| admin@ecommerce.com | Admin123! | ADMIN |
+| operador@ecommerce.com | Operador123! | OPERADOR |
+| lectura@ecommerce.com | Lectura123! | LECTURA |
 
-### Usuarios Demo
+### Rate Limiting
 
-| Usuario | Contraseña | Rol |
-|---------|------------|-----|
-| admin | Admin123! | admin |
-| operador | Operador123! | operator |
-| visor | Visor123! | viewer |
+| Endpoint | Límite | Descripción |
+|----------|--------|-------------|
+| Anónimo | 50/min | Usuarios no autenticados |
+| Autenticado | 200/min | Usuarios con JWT válido |
+| `/auth/login` | 5/min | Prevención de fuerza bruta |
+| `/ordenes/*` | 20/min | Protección contra fraude |
 
-### Roles y Permisos
+### Auditoría
 
-| Rol | Permisos |
-|-----|----------|
-| **admin** | CRUD completo + gestión usuarios |
-| **operator** | Crear, leer, actualizar |
-| **viewer** | Solo lectura |
+Todos los accesos se registran automáticamente:
 
-📖 **Documentación completa:** [docs/AUTENTICACION_JWT.md](docs/AUTENTICACION_JWT.md)
-
----
-
-## 💎 Capa de Dominio
-
-### Entidades
-
-#### Cliente
 ```python
-class Cliente(EntidadBase):
-    nombre: str
-    apellido: str
-    email: Email          # Value Object
-    documento: DocumentoIdentidad  # Value Object
-    telefono: Telefono    # Value Object (opcional)
-    activo: bool
+# Consultar logs
+from infrastructure.persistence.django.models import AuditoriaAccesoAPI
+
+# Últimos accesos fallidos
+AuditoriaAccesoAPI.objects.filter(resultado_exitoso=False)[:50]
 ```
 
-#### Producto
-```python
-class Producto(EntidadBase):
-    codigo: CodigoProducto
-    nombre: str
-    precio: Dinero        # Value Object
-    stock_actual: int
-    
-    def reservar_stock(self, cantidad: int):
-        if cantidad > self.stock_actual:
-            raise ReglaNegocioViolada("Stock insuficiente")
-        self.stock_actual -= cantidad
+---
+
+## 🌐 API REST
+
+### Uso de Endpoints Protegidos
+
+```bash
+# Obtener token
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@ecommerce.com","password":"Admin123!"}' \
+  | jq -r '.access')
+
+# Usar en requests
+curl http://localhost:8000/api/v1/productos \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
-#### Orden (Máquina de Estados)
+### Endpoints Principales
+
+#### Productos
+
+```bash
+GET    /api/v1/productos           # Listar todos
+GET    /api/v1/productos/{id}      # Obtener uno
+POST   /api/v1/productos           # Crear (OPERADOR+)
+PUT    /api/v1/productos/{id}      # Actualizar (OPERADOR+)
+DELETE /api/v1/productos/{id}      # Eliminar (ADMIN)
+```
+
+#### Clientes
+
+```bash
+GET    /api/v1/clientes            # Listar todos
+GET    /api/v1/clientes/{id}       # Obtener uno
+POST   /api/v1/clientes            # Crear (OPERADOR+)
+PUT    /api/v1/clientes/{id}       # Actualizar (OPERADOR+)
+```
+
+#### Órdenes
+
+```bash
+POST   /api/v1/ordenes                    # Crear orden
+POST   /api/v1/ordenes/{id}/lineas        # Agregar línea
+POST   /api/v1/ordenes/{id}/confirmar     # Confirmar orden
+```
+
+### Respuestas de Error
+
+```json
+// 401 - No autenticado
+{ "detail": "Authentication credentials were not provided." }
+
+// 403 - Sin permisos
+{ "detail": "Se requiere rol de Operador o Administrador." }
+
+// 429 - Rate limit excedido
+{
+  "error": "Demasiadas solicitudes",
+  "detail": "Ha realizado demasiadas solicitudes. Espere antes de reintentar."
+}
+```
+
+---
+
+## 🧠 Modelado de Dominio
+
+### Entidades Principales
+
+```mermaid
+classDiagram
+    class Cliente {
+        -UUID id
+        -String nombre
+        -Email email
+        -DocumentoIdentidad documento
+        -bool activo
+        +activar()
+        +desactivar()
+    }
+
+    class Producto {
+        -UUID id
+        -String nombre
+        -CodigoProducto codigo
+        -Dinero precio
+        -int stock
+        +reducir_stock(cantidad)
+        +aumentar_stock(cantidad)
+    }
+
+    class Orden {
+        -UUID id
+        -Cliente cliente
+        -List~LineaOrden~ lineas
+        -EstadoOrden estado
+        -Dinero total
+        +agregar_linea(producto, cantidad)
+        +confirmar()
+        +cancelar()
+    }
+
+    class Email {
+        <<Value Object>>
+        -String direccion
+        +validar()
+    }
+
+    class Dinero {
+        <<Value Object>>
+        -Decimal monto
+        -String moneda
+        +sumar(otro)
+        +multiplicar(factor)
+    }
+
+    Cliente *-- Email
+    Cliente *-- DocumentoIdentidad
+    Orden --> Cliente
+    Orden *-- LineaOrden
+    Producto *-- Dinero
+```
+
+### Ciclo de Vida de Órdenes
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CREADA
-    CREADA --> CONFIRMADA : confirmar()
-    CREADA --> CANCELADA : cancelar()
-    CONFIRMADA --> ENVIADA : enviar()
-    ENVIADA --> ENTREGADA : entregar()
+    [*] --> CREADA: Checkout
+    CREADA --> CONFIRMADA: Pago Exitoso
+    CREADA --> CANCELADA: Cancelar
+    CONFIRMADA --> ENVIADA: Despachar
+    CONFIRMADA --> CANCELADA: Cancelar Admin
+    ENVIADA --> ENTREGADA: Confirmar Entrega
     ENTREGADA --> [*]
     CANCELADA --> [*]
 ```
 
-### Value Objects
-
-Encapsulan validaciones y garantizan inmutabilidad:
-
-| Value Object | Validación |
-|--------------|------------|
-| `Email` | Formato RFC 5322 |
-| `Telefono` | Mínimo 8 dígitos |
-| `Dinero` | Monto >= 0, moneda válida |
-| `DocumentoIdentidad` | Tipo + número válido |
-
-### Excepciones de Dominio
-
-```python
-ExcepcionDominio       # Base
-├── ValorInvalido      # VO inválido → HTTP 400
-├── ReglaNegocioViolada # Lógica violada → HTTP 409
-├── EntidadNoEncontrada # No existe → HTTP 404
-└── EstadoInvalido     # Transición inválida → HTTP 409
-```
-
 ---
 
-## 🔌 Capa de Infraestructura
+## 💾 Base de Datos
 
-### Repositorios
-
-Implementan interfaces del dominio con Django ORM:
-
-```python
-class ClienteRepositoryImpl(ClienteRepository):
-    def guardar(self, entidad: Cliente) -> Cliente:
-        model = self._to_model(entidad)
-        model.save()
-        self._auditoria.registrar("clientes", "CREATE", ...)
-        return self._to_domain(model)
-```
-
-### Control de Concurrencia
-
-**Bloqueo pesimista** para operaciones de stock:
-
-```python
-def obtener_con_bloqueo(self, id: UUID) -> Producto:
-    # SELECT ... FOR UPDATE
-    model = ProductoModel.objects.select_for_update().get(id=id)
-    return self._to_domain(model)
-```
-
-### Modelo de Datos
+### Esquema ER
 
 ```mermaid
 erDiagram
@@ -350,154 +494,104 @@ erDiagram
 
     CLIENTES {
         uuid id PK
-        varchar email UK
-        varchar documento UK
+        string nombre
+        string email UK
+        string tipo_documento
+        string numero_documento
+        string telefono
+        bool activo
+        datetime created_at
     }
+
+    PRODUCTOS {
+        uuid id PK
+        string codigo UK
+        string nombre
+        decimal precio
+        int stock
+        bool activo
+        datetime created_at
+    }
+
     ORDENES {
         uuid id PK
         uuid cliente_id FK
-        varchar estado
         decimal total
+        enum estado
+        datetime created_at
     }
-    PRODUCTOS {
+
+    LINEAS_ORDEN {
         uuid id PK
-        varchar codigo UK
-        int stock
+        uuid orden_id FK
+        uuid producto_id FK
+        int cantidad
+        decimal precio_unitario
+        decimal subtotal
     }
 ```
 
----
+### Migraciones
 
-## 🔒 Seguridad
+```bash
+# Crear nuevas migraciones
+python manage.py makemigrations
 
-### Protección Implementada
+# Aplicar migraciones
+python manage.py migrate
 
-| Capa | Mecanismo |
-|------|-----------|
-| **Autenticación** | JWT con refresh tokens |
-| **Autorización** | RBAC (roles y permisos) |
-| **Rate Limiting** | 100 req/min anónimos, 1000 auth |
-| **Headers** | HSTS, X-Frame-Options, CSP |
-| **Auditoría** | Log de todos los accesos |
-
-### Rate Limiting
-
-```python
-# Límites por defecto
-THROTTLE_RATES = {
-    'anon': '100/minute',      # No autenticado
-    'user': '1000/minute',     # Autenticado
-    'auth': '5/minute',        # Endpoints de auth
-}
+# Ver migraciones pendientes
+python manage.py showmigrations
 ```
-
-📖 **Documentación completa:** [docs/PROTECCION_ANTI_ABUSO.md](docs/PROTECCION_ANTI_ABUSO.md)
 
 ---
 
 ## 🧪 Testing
 
-### Scripts de Verificación
+### Ejecutar Tests
 
 ```bash
-# Verificar API completa
-python scripts/verify_api_rest.py
+# Tests unitarios
+pytest
 
-# Test de autenticación
+# Tests de autenticación
 python scripts/test_api_auth.py
 
-# Test de rate limiting
+# Tests de rate limiting
 python scripts/test_rate_limit.py
 
-# Test de concurrencia
-python scripts/test_concurrencia_stock.py
+# Validación completa del sistema
+python scripts/validar_sistema.py
 ```
 
-### Flujo E2E
-
-El script `verify_api_rest.py` ejecuta:
-1. ✅ Login y obtención de token
-2. ✅ Creación de cliente
-3. ✅ Creación de producto
-4. ✅ Creación de orden
-5. ✅ Agregar línea a orden
-6. ✅ Confirmación de orden (descuenta stock)
-
----
-
-## 📁 Estructura del Proyecto
+### Resultado Esperado de test_api_auth.py
 
 ```
-e-comerce/
-├── src/
-│   ├── domain/              # 💎 Núcleo (Python puro)
-│   │   ├── entities/        # Cliente, Producto, Orden
-│   │   ├── value_objects/   # Email, Dinero, etc.
-│   │   ├── repositories/    # Interfaces
-│   │   └── exceptions/      # Excepciones de dominio
-│   │
-│   ├── application/         # ⚙️ Casos de Uso
-│   │   ├── use_cases/       # Lógica de aplicación
-│   │   └── dto/             # Data Transfer Objects
-│   │
-│   ├── infrastructure/      # 🔌 Adaptadores
-│   │   ├── persistence/     # Django ORM
-│   │   ├── auth/            # JWT + Usuarios
-│   │   ├── auditing/        # Sistema de auditoría
-│   │   └── config/          # Django settings
-│   │
-│   └── interfaces/          # 📡 API REST
-│       ├── api/rest/        # Views, Serializers
-│       └── permissions/     # RBAC
-│
-├── docs/                    # Documentación adicional
-├── scripts/                 # Scripts de testing
-└── manage.py
+✓ Servidor disponible
+✓ Acceso sin token → 401
+✓ Token inválido → 401
+✓ Login y acceso ADMIN
+✓ Permisos OPERADOR
+✓ Permisos LECTURA → 403 al escribir
+✓ Refresh token funciona
+✓ Logout invalida token
+
+Total: 8/8 tests pasados
+✓ TODOS LOS TESTS PASARON
 ```
 
 ---
 
-## 🛠️ Comandos Útiles
+## 📚 Referencias
 
-```bash
-# Servidor de desarrollo
-python manage.py runserver
-
-# Crear usuarios demo
-python manage.py crear_usuarios_demo
-
-# Migraciones
-python manage.py makemigrations
-python manage.py migrate
-
-# Shell interactivo
-python manage.py shell
-
-# Producción (Gunicorn)
-gunicorn --bind 0.0.0.0:8000 --workers 4 infrastructure.config.django_wsgi:application
-```
+- [Clean Architecture - Robert C. Martin](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+- [Domain-Driven Design - Eric Evans](https://www.domainlanguage.com/ddd/)
+- [Django REST Framework](https://www.django-rest-framework.org/)
+- [SimpleJWT](https://django-rest-framework-simplejwt.readthedocs.io/)
+- [OWASP API Security](https://owasp.org/www-project-api-security/)
 
 ---
 
-## 📚 Documentación Adicional
-
-- [Autenticación JWT](docs/AUTENTICACION_JWT.md) - Configuración y uso del sistema de autenticación
-- [Protección Anti-Abuso](docs/PROTECCION_ANTI_ABUSO.md) - Rate limiting y throttling
-- [Instrucciones de Activación](INSTRUCCIONES_ACTIVACION_AUTH.md) - Guía paso a paso
-
----
-
-## 📝 Stack Tecnológico
-
-| Componente | Tecnología |
-|------------|------------|
-| **Lenguaje** | Python 3.14+ |
-| **Framework** | Django 6.0 |
-| **API** | Django REST Framework 3.15 |
-| **Base de Datos** | PostgreSQL 18 |
-| **Autenticación** | Simple JWT |
-| **ORM** | Django ORM |
-
----
-
-**Última actualización:** 2026-01-17
+<div align="center">
+    <sub>Desarrollado con Clean Architecture y mejores prácticas de ingeniería de software.</sub>
+</div>
