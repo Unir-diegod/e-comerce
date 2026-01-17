@@ -4,14 +4,14 @@ Casos de uso relacionados con Cliente
 from typing import Optional
 from uuid import UUID
 
-from .base import CasoUsoBase
-from ..dto.cliente_dto import CrearClienteDTO, ClienteDTO, ActualizarClienteDTO
-from ...domain.repositories.cliente_repository import ClienteRepository
-from ...domain.entities.cliente import Cliente
-from ...domain.value_objects.email import Email
-from ...domain.value_objects.telefono import Telefono
-from ...domain.value_objects.documento_identidad import DocumentoIdentidad
-from ...domain.exceptions.dominio import EntidadNoEncontrada
+from application.use_cases.base import CasoUsoBase
+from application.dto.cliente_dto import CrearClienteDTO, ClienteDTO, ActualizarClienteDTO
+from domain.repositories.cliente_repository import ClienteRepository
+from domain.entities.cliente import Cliente
+from domain.value_objects.email import Email
+from domain.value_objects.telefono import Telefono
+from domain.value_objects.documento_identidad import DocumentoIdentidad
+from domain.exceptions.dominio import EntidadNoEncontrada
 
 
 class CrearClienteUseCase(CasoUsoBase[CrearClienteDTO, ClienteDTO]):
@@ -32,7 +32,7 @@ class CrearClienteUseCase(CasoUsoBase[CrearClienteDTO, ClienteDTO]):
         existente = self._cliente_repository.obtener_por_email(email)
         
         if existente:
-            from ...domain.exceptions.dominio import ReglaNegocioViolada
+            from domain.exceptions.dominio import ReglaNegocioViolada
             raise ReglaNegocioViolada(f"Ya existe un cliente con el email {request.email}")
         
         # Crear entidad

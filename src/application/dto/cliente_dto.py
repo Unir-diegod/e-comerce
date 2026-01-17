@@ -6,8 +6,8 @@ from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
-from ...domain.entities.cliente import Cliente
-from ...shared.enums.tipos_documento import TipoDocumento
+from domain.entities.cliente import Cliente
+from shared.enums.tipos_documento import TipoDocumento
 
 
 @dataclass

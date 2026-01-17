@@ -1,9 +1,9 @@
 """
 Value Object Documento de Identidad
 """
-from .base import ValueObject
-from ..exceptions.dominio import ValorInvalido
-from ...shared.enums.tipos_documento import TipoDocumento
+from domain.value_objects.base import ValueObject
+from domain.exceptions.dominio import ValorInvalido
+from shared.enums.tipos_documento import TipoDocumento
 
 
 class DocumentoIdentidad(ValueObject):

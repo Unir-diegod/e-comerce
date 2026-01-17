@@ -11,10 +11,17 @@ uvicorn[standard]>=0.32.0
 django>=5.1.0
 
 # ------------------------------------------------------------------------------
-# Database - MySQL (Hostinger)
+# Database - PostgreSQL (PRODUCTION)
 # ------------------------------------------------------------------------------
-pymysql>=1.1.0
-cryptography>=43.0.0          # Requerido para PyMySQL con SSL
+psycopg[binary]>=3.2.0        # PostgreSQL adapter (psycopg3 - Recomendado)
+# psycopg2-binary>=2.9.9      # Alternativa: psycopg2 (legacy, solo si es necesario)
+python-dotenv>=1.0.0          # Cargar variables de entorno desde .env
+
+# ------------------------------------------------------------------------------
+# Database - MySQL (Legacy/Desarrollo)
+# ------------------------------------------------------------------------------
+# pymysql>=1.1.0              # MySQL adapter (comentado, usar PostgreSQL)
+# cryptography>=43.0.0        # Requerido para PyMySQL con SSL
 
 # ------------------------------------------------------------------------------
 # ORM y Database Toolkit
