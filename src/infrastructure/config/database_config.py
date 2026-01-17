@@ -118,9 +118,19 @@ class DatabaseConfig:
         }
         
         # Configuración adicional para pool de conexiones en producción
-        if os.environ.get('DJANGO_ENV', 'development') == 'production':
+        environment = os.environ.get('DJANGO_ENVIRONMENT', 'development')
+        
+        if environment in ['production', 'staging']:
             config['default']['CONN_MAX_AGE'] = 600  # 10 minutos
             config['default']['CONN_HEALTH_CHECKS'] = True
+            
+            # VALIDACIÓN CRÍTICA: SSL obligatorio en producción
+            if db_ssl_mode not in ['require', 'verify-ca', 'verify-full']:
+                raise ErrorConfiguracion(
+                    f"SSL inseguro en ambiente {environment}. "
+                    f"DB_SSL_MODE debe ser 'require', 'verify-ca', o 'verify-full'. "
+                    f"Valor actual: '{db_ssl_mode}'"
+                )
         
         return config
     

@@ -24,6 +24,7 @@ wheels/
 *.egg
 
 # Virtual environments
+.venv/
 venv/
 ENV/
 env/
@@ -46,6 +47,8 @@ env/
 # Logs
 *.log
 logs/
+verify_output.txt
+test_output.txt
 
 # OS
 .DS_Store

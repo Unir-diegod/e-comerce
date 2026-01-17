@@ -170,3 +170,141 @@ class OrdenRepositoryImpl(OrdenRepository):
             return True
         except OrdenModel.DoesNotExist:
             return False
+    
+    @transaction.atomic
+    def confirmar_con_stock(self, orden_id: UUID) -> Orden:
+        """
+        Confirma orden con validación y descuento de stock atómico.
+        
+        CRÍTICO: Implementa control de concurrencia mediante:
+        1. Transacción atómica (transaction.atomic)
+        2. Bloqueos pesimistas (select_for_update)
+        3. Validación de stock antes de descontar
+        4. Rollback automático si falla
+        
+        Garantiza que NO ocurra overselling bajo alta concurrencia.
+        """
+        from domain.exceptions.dominio import EntidadNoEncontrada, ReglaNegocioViolada
+        
+        self._logger.info("Confirmando orden con validación de stock", orden_id=str(orden_id))
+        
+        try:
+            # 1. Obtener orden (sin bloqueo, no es crítico)
+            orden = self.obtener_por_id(orden_id)
+            if not orden:
+                raise EntidadNoEncontrada(f"Orden {orden_id} no encontrada")
+            
+            # 2. Validar estado de la orden
+            if orden.estado != EstadoOrden.BORRADOR:
+                raise ReglaNegocioViolada(
+                    f"Solo se pueden confirmar órdenes en estado BORRADOR. Estado actual: {orden.estado.value}"
+                )
+            
+            if not orden.lineas:
+                raise ReglaNegocioViolada("No se puede confirmar una orden sin líneas")
+            
+            # 3. BLOQUEO CRÍTICO: Validar y descontar stock de cada producto
+            productos_afectados = []
+            
+            for linea in orden.lineas:
+                # BLOQUEO PESIMISTA: Otras transacciones esperarán aquí
+                producto_model = ProductoModel.objects.select_for_update().get(id=linea.producto_id)
+                
+                # Validar stock disponible
+                if producto_model.stock_actual < linea.cantidad:
+                    # Auditar intento fallido
+                    self._auditoria.registrar(
+                        entidad_tipo="Orden",
+                        entidad_id=orden_id,
+                        accion="CONFIRMAR_STOCK",
+                        resultado="FALLO",
+                        mensaje=f"Stock insuficiente para producto {producto_model.nombre}. "
+                               f"Disponible: {producto_model.stock_actual}, Solicitado: {linea.cantidad}"
+                    )
+                    
+                    raise ReglaNegocioViolada(
+                        f"Stock insuficiente para {producto_model.nombre}. "
+                        f"Disponible: {producto_model.stock_actual}, Solicitado: {linea.cantidad}"
+                    )
+                
+                # Descontar stock
+                stock_anterior = producto_model.stock_actual
+                producto_model.stock_actual -= linea.cantidad
+                producto_model.save()
+                
+                productos_afectados.append({
+                    "producto_id": str(producto_model.id),
+                    "nombre": producto_model.nombre,
+                    "stock_anterior": stock_anterior,
+                    "stock_nuevo": producto_model.stock_actual,
+                    "cantidad_descontada": linea.cantidad
+                })
+                
+                self._logger.info(
+                    "Stock descontado",
+                    producto_id=str(producto_model.id),
+                    stock_anterior=stock_anterior,
+                    cantidad_descontada=linea.cantidad,
+                    stock_nuevo=producto_model.stock_actual
+                )
+            
+            # 4. Confirmar orden (cambio de estado)
+            orden.confirmar()
+            
+            # 5. Actualizar modelo de orden en base de datos
+            orden_model = OrdenModel.objects.get(id=orden_id)
+            orden_model.estado = orden.estado.value
+            orden_model.total_monto = orden.total.monto
+            orden_model.total_moneda = orden.total.moneda
+            orden_model.save()
+            
+            # Recrear líneas (por si acaso, aunque no deberían cambiar)
+            # Las líneas ya existen, no es necesario recrearlas
+            
+            # Convertir a dominio para retornar
+            orden_confirmada = self._to_domain(orden_model)
+            
+            # 6. Auditoría exitosa
+            self._auditoria.registrar(
+                entidad_tipo="Orden",
+                entidad_id=orden_id,
+                accion="CONFIRMAR_STOCK",
+                datos_nuevos={"productos_afectados": productos_afectados},
+                resultado="EXITO",
+                mensaje=f"Orden confirmada con descuento de stock en {len(productos_afectados)} productos"
+            )
+            
+            self._logger.info(
+                "Orden confirmada exitosamente con descuento de stock",
+                orden_id=str(orden_id),
+                productos_afectados=len(productos_afectados)
+            )
+            
+            return orden_confirmada
+            
+        except (EntidadNoEncontrada, ReglaNegocioViolada) as e:
+            # Excepciones de negocio: re-lanzar
+            self._logger.warning(
+                "Fallo en confirmación de orden",
+                orden_id=str(orden_id),
+                error=str(e)
+            )
+            raise
+            
+        except Exception as e:
+            # Errores inesperados
+            self._logger.error(
+                "Error crítico al confirmar orden con stock",
+                orden_id=str(orden_id),
+                error=str(e)
+            )
+            
+            self._auditoria.registrar(
+                entidad_tipo="Orden",
+                entidad_id=orden_id,
+                accion="CONFIRMAR_STOCK",
+                resultado="FALLO",
+                mensaje=f"Error inesperado: {str(e)}"
+            )
+            
+            raise

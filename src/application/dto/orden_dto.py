@@ -7,7 +7,7 @@ from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
 
-from ...domain.entities.orden import Orden
+from domain.entities.orden import Orden
 
 
 @dataclass

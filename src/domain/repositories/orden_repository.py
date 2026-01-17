@@ -29,4 +29,22 @@ class OrdenRepository(RepositorioBase[Orden]):
     @abstractmethod
     def obtener_pendientes_procesamiento(self) -> List[Orden]:
         """Obtiene órdenes confirmadas pendientes de procesamiento"""
+        pass    
+    @abstractmethod
+    def confirmar_con_stock(self, orden_id) -> 'Orden':
+        """
+        Confirma una orden validando y descontando stock atómicamente.
+        
+        IMPORTANTE: Implementa control de concurrencia con bloqueos pesimistas.
+        
+        Args:
+            orden_id: UUID de la orden a confirmar
+            
+        Returns:
+            Orden confirmada con stock descontado
+            
+        Raises:
+            EntidadNoEncontrada: Si la orden no existe
+            ReglaNegocioViolada: Si no hay stock suficiente o la orden no es válida
+        """
         pass

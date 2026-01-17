@@ -34,3 +34,15 @@ class ProductoRepository(RepositorioBase[Producto]):
     def obtener_disponibles(self) -> List[Producto]:
         """Obtiene productos disponibles para venta"""
         pass
+    
+    @abstractmethod
+    def obtener_con_bloqueo(self, id) -> Optional[Producto]:
+        """
+        Obtiene un producto con bloqueo pesimista (SELECT FOR UPDATE).
+        
+        IMPORTANTE: Debe ejecutarse dentro de transaction.atomic()
+        para evitar bloqueos perpetuos.
+        
+        Uso: Control de concurrencia en operaciones críticas de stock.
+        """
+        pass

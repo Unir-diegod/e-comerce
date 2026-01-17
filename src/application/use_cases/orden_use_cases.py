@@ -5,15 +5,15 @@ from typing import List
 from uuid import UUID
 from decimal import Decimal
 
-from .base import CasoUsoBase
-from ..dto.orden_dto import CrearOrdenDTO, OrdenDTO, AgregarLineaOrdenDTO
-from ...domain.repositories.orden_repository import OrdenRepository
-from ...domain.repositories.cliente_repository import ClienteRepository
-from ...domain.repositories.producto_repository import ProductoRepository
-from ...domain.entities.orden import Orden
-from ...domain.value_objects.linea_orden import LineaOrden
-from ...domain.value_objects.dinero import Dinero
-from ...domain.exceptions.dominio import EntidadNoEncontrada, ReglaNegocioViolada
+from application.use_cases.base import CasoUsoBase
+from application.dto.orden_dto import CrearOrdenDTO, OrdenDTO, AgregarLineaOrdenDTO
+from domain.repositories.orden_repository import OrdenRepository
+from domain.repositories.cliente_repository import ClienteRepository
+from domain.repositories.producto_repository import ProductoRepository
+from domain.entities.orden import Orden
+from domain.value_objects.linea_orden import LineaOrden
+from domain.value_objects.dinero import Dinero
+from domain.exceptions.dominio import EntidadNoEncontrada, ReglaNegocioViolada
 
 
 class CrearOrdenUseCase(CasoUsoBase[CrearOrdenDTO, OrdenDTO]):
@@ -120,5 +120,41 @@ class ConfirmarOrdenUseCase(CasoUsoBase[UUID, OrdenDTO]):
         orden_confirmada = self._orden_repository.guardar(orden)
         
         # Punto de extensión: emitir evento OrdenConfirmada
+        
+        return OrdenDTO.desde_entidad(orden_confirmada)
+
+
+class ConfirmarOrdenConStockUseCase(CasoUsoBase[UUID, OrdenDTO]):
+    """
+    Caso de uso: Confirmar orden con validación y descuento de stock.
+    
+    CRÍTICO: Implementa control de concurrencia para evitar overselling.
+    Usa bloqueos pesimistas (SELECT FOR UPDATE) en PostgreSQL.
+    
+    Responsabilidades:
+    - Validar stock disponible bajo bloqueo
+    - Descontar stock atómicamente
+    - Confirmar orden
+    - Garantizar consistencia ante concurrencia
+    """
+    
+    def __init__(
+        self,
+        orden_repository: OrdenRepository,
+        producto_repository: ProductoRepository
+    ):
+        self._orden_repository = orden_repository
+        self._producto_repository = producto_repository
+    
+    def ejecutar(self, request: UUID) -> OrdenDTO:
+        """
+        Confirma orden con descuento de stock.
+        
+        IMPORTANTE: Este método delega el control de concurrencia
+        al repositorio de Orden, que debe implementar la transacción
+        atómica completa con bloqueos.
+        """
+        # Delegar al repositorio que tiene acceso a transaction.atomic
+        orden_confirmada = self._orden_repository.confirmar_con_stock(request)
         
         return OrdenDTO.desde_entidad(orden_confirmada)

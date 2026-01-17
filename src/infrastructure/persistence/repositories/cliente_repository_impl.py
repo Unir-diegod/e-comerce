@@ -264,7 +264,12 @@ class ClienteRepositoryImpl(ClienteRepository):
             
             # Convertir a modelo y guardar
             model = self._to_model(entidad)
-            model.save()
+            
+            # Django ORM: Usar update_or_create o save con force_update/force_insert
+            if existe:
+                model.save(force_update=True)
+            else:
+                model.save(force_insert=True)
             
             # Datos nuevos para auditoría
             datos_nuevos = {

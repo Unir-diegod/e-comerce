@@ -117,3 +117,55 @@ class LineaOrdenModel(models.Model):
 
     def __str__(self) -> str:
         return f"{self.cantidad}x {self.producto} en Orden {self.orden_id}"
+
+
+class RegistroAuditoriaModel(models.Model):
+    """
+    Modelo ORM para Registro de Auditoría.
+    
+    Responsabilidades:
+    - Trazabilidad inmutable de operaciones críticas
+    - Soporte para compliance y forense
+    - No se actualiza ni elimina después de crear
+    """
+    id = models.UUIDField(primary_key=True, editable=False)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    usuario_id = models.UUIDField(null=True, blank=True)
+    entidad_tipo = models.CharField(max_length=50, db_index=True)
+    entidad_id = models.UUIDField(db_index=True)
+    accion = models.CharField(max_length=20, db_index=True)
+    datos_previos = models.JSONField(null=True, blank=True)
+    datos_nuevos = models.JSONField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+    resultado = models.CharField(max_length=20)
+    mensaje = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'auditoria_registros'
+        verbose_name = 'Registro de Auditoría'
+        verbose_name_plural = 'Registros de Auditoría'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['entidad_tipo', 'entidad_id']),
+            models.Index(fields=['accion', 'timestamp']),
+            models.Index(fields=['resultado', 'timestamp']),
+            models.Index(fields=['usuario_id', 'timestamp']),
+        ]
+        # Protección contra modificaciones accidentales
+        permissions = [
+            ('view_auditoria', 'Can view audit logs'),
+        ]
+
+    def __str__(self) -> str:
+        return f"Auditoría {self.accion} - {self.entidad_tipo} {self.entidad_id} [{self.resultado}]"
+    
+    def save(self, *args, **kwargs):
+        """Solo permite INSERT, no UPDATE"""
+        if self.pk and RegistroAuditoriaModel.objects.filter(pk=self.pk).exists():
+            raise ValueError("Los registros de auditoría son inmutables y no pueden actualizarse")
+        super().save(*args, **kwargs)
+    
+    def delete(self, *args, **kwargs):
+        """Bloquea eliminación de registros de auditoría"""
+        raise ValueError("Los registros de auditoría no pueden eliminarse")

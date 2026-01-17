@@ -97,6 +97,35 @@ class ProductoRepositoryImpl(ProductoRepository):
         self._logger.info("Obteniendo productos disponibles")
         models = ProductoModel.objects.filter(activo=True, stock_actual__gt=0)
         return [self._to_domain(model) for model in models]
+    
+    def obtener_con_bloqueo(self, id: UUID) -> Optional[Producto]:
+        """
+        Obtiene producto con bloqueo pesimista (SELECT FOR UPDATE).
+        
+        CRÍTICO: Previene race conditions en operaciones de stock.
+        PostgreSQL bloquea la fila hasta que la transacción termine.
+        
+        REQUIERE: Estar dentro de transaction.atomic()
+        """
+        self._logger.info("Obteniendo producto con bloqueo", producto_id=str(id))
+        
+        try:
+            # SELECT FOR UPDATE: Bloqueo pesimista a nivel de fila
+            # Otras transacciones esperarán hasta que esta termine
+            model = ProductoModel.objects.select_for_update().get(id=id)
+            producto = self._to_domain(model)
+            
+            self._logger.info(
+                "Producto bloqueado para actualización",
+                producto_id=str(id),
+                stock_actual=producto.stock_actual
+            )
+            
+            return producto
+            
+        except ProductoModel.DoesNotExist:
+            self._logger.warning("Producto no encontrado para bloqueo", producto_id=str(id))
+            return None
 
     def guardar(self, entidad: Producto) -> Producto:
         producto_id = str(entidad.id)
