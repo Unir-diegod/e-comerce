@@ -1,14 +1,14 @@
 <div align="center">
 
-# Sistema Empresarial de Gestión - Clean Architecture
+# 🏢 Sistema Empresarial de Gestión - Clean Architecture
 
-### Sistema Empresarial con CQRS y Arquitectura Orientada a Eventos
+### Arquitectura Empresarial escalable con DDD, CQRS y Event-Driven Design
 
 [![Python](https://img.shields.io/badge/Python-3.14+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-6.0-092E20?style=flat-square&logo=django&logoColor=white)](https://www.djangoproject.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.1-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.128-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+[![Architecture](https://img.shields.io/badge/Architecture-Clean-orange.svg?style=flat-square)](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 
 </div>
 
@@ -16,198 +16,224 @@
 
 ## 📋 Visión General
 
-Este proyecto es un sistema empresarial diseñado estrictamente siguiendo **Clean Architecture**, **Domain-Driven Design (DDD)**, y patrones **CQRS**. Desacopla la lógica de negocio de los frameworks externos, asegurando mantenibilidad, testabilidad y escalabilidad.
+Este sistema es una implementación de **referencia industrial** de principios de ingeniería de software moderna. Diseñado para desacoplar completamente la lógica de negocio de la infraestructura tecnológica, permite que el sistema evolucione sin deuda técnica.
 
-Este proyecto demuestra cómo construir aplicaciones Python complejas donde las reglas de negocio están protegidas de cambios tecnológicos (como cambiar la base de datos o el framework web).
+El núcleo de la aplicación implementa **Domain-Driven Design (DDD)** para modelar procesos de negocio complejos, mientras que la separación por **Capas (Clean Architecture)** asegura que bases de datos, APIs y frameworks sean meros detalles de implementación.
 
 ---
 
-## 🏗️ Arquitectura
+## 🏗️ Arquitectura del Sistema
 
-Este proyecto implementa **Clean Architecture / Hexagonal Architecture** estrictamente.
+La arquitectura está diseñada concéntricamente. Las dependencias fluyen **únicamente hacia adentro**, protegiendo el Dominio (reglas de negocio) de cambios externos.
 
-### Capas
-
-El sistema está organizado en capas concéntricas, con dependencias apuntando **hacia adentro**. Las capas internas no conocen nada de las externas.
-
-```text
-src/
-├── domain/         # Núcleo de negocio (sin dependencias externas)
-├── application/    # Casos de uso y lógica de aplicación
-├── infrastructure/ # Implementaciones técnicas (DB, logging, etc.)
-├── interfaces/     # APIs y puntos de entrada
-└── shared/         # Componentes compartidos
-```
+### Diagrama de Componentes y Capas
 
 ```mermaid
 graph TD
-    subgraph Infrastructure [Capa de Infraestructura]
-        DB[(PostgreSQL)]
-        ORM[Django ORM]
-        RepoImpl[Implementación Repositorios]
-        Auth[Servicio Auth]
+    subgraph Presentation ["📱 Capa de Presentación (Interfaces)"]
+        API[FastAPI Router]
+        Admin[Django Admin]
+        CLI[Comandos Manage.py]
     end
 
-    subgraph Interfaces [Capa de Interfaces]
-        API[FastAPI / Django Views]
-        CLI[Comandos de Gestión]
+    subgraph Application ["⚙️ Capa de Aplicación (Orquestación)"]
+        UseCases[Casos de Uso]
+        DTOs[DTOs / Esquemas]
+        Ports[Puertos / Interfaces]
     end
 
-    subgraph Application [Capa de Aplicación]
-        UC[Casos de Uso]
-        DTO[DTOs]
-        Ports[Puertos Entrada/Salida]
-    end
-
-    subgraph Domain [Capa de Dominio]
-        Entity[Entidades]
+    subgraph Domain ["💎 Capa de Dominio (Núcleo)"]
+        Entities[Entidades y Agregados]
         VO[Value Objects]
-        RepoInt[Interfaces Repositorios]
+        RepoInt[Interfaces de Repositorio]
         Events[Eventos de Dominio]
     end
 
-    Interfaces --> Application
-    Infrastructure --> Domain
+    subgraph Infrastructure ["🔌 Capa de Infraestructura (Adaptadores)"]
+        RepoImpl[Implementación Repositorios]
+        ORM[Django ORM]
+        Postgres[(PostgreSQL)]
+        EmailSvc[Servicios Externos]
+    end
+
+    Presentation --> Application
     Application --> Domain
-    RepoImpl -. implementa .-> RepoInt
+    Infrastructure --> Domain
     
-    style Domain fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style Application fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    RepoImpl -. Implementa .-> RepoInt
+    RepoImpl --> ORM
+    ORM --> Postgres
+    
+    style Domain fill:#fff3e0,stroke:#ff6f00,stroke-width:2px,color:#d84315
+    style Application fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+    style Infrastructure fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
+    style Presentation fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
 ```
 
-### Principios
+---
 
-*   **Dominio puro**: Sin dependencias a frameworks (Django, FastAPI), SQL o HTTP.
-*   **Inversión de dependencias**: La infraestructura depende del dominio, nunca al revés.
-*   **Separación de responsabilidades**: Cada capa tiene un propósito claro.
-*   **Preparado para escalar**: Arquitectura orientada a eventos (Event-Driven) lista para implementar.
+## 🔄 Flujos de Datos (CQRS)
+
+El sistema separa las operaciones de lectura y escritura para optimizar rendimiento y seguridad.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    padding 20
+    participant Client as Cliente (API/Web)
+    participant API as FastAPI Router
+    participant UC as Caso de Uso
+    participant Dom as Entidad de Dominio
+    participant Repo as Repositorio
+    participant DB as PostgreSQL
+
+    rect rgb(240, 248, 255)
+        Note over Client, DB: Flujo de Comando (Escritura)
+        Client->>API: POST /clientes (Crear)
+        API->>UC: Ejecutar(DTO)
+        UC->>Dom: Crear Entidad + Validar Invariantes
+        Dom-->>UC: Entidad Válida
+        UC->>Repo: Guardar(Entidad)
+        Repo->>DB: INSERT / UPDATE
+        DB-->>Repo: Confirmación
+        Repo-->>UC: Entidad Persistida
+        UC-->>API: Resultado DTO
+        API-->>Client: 201 Created
+    end
+```
 
 ---
 
-## 🚀 Características
+## 🧠 Modelado de Dominio (DDD)
 
-*   **Cumplimiento Estricto de Clean Architecture**: Sin fugas de framework en la lógica de negocio.
-*   **CQRS Ready**: Modelos separados para Lectura (Queries) y Escritura (Commands).
-*   **Event-Driven**: Eventos de dominio para efectos secundarios (ej. "Enviar email cuando se crea orden").
-*   **Soporte Dual de Framework**: Usa Django para Admin/ORM y FastAPI para APIs asíncronas de alto rendimiento.
-*   **Manejo Robusto de Errores**: Manejo de excepciones centralizado mapeado a códigos de estado HTTP.
+### Diagrama de Clases (Agregado Cliente)
+El diseño utiliza **Value Objects** para encapsular reglas de validación (email válido, formato de teléfono) y **Agregados** para garantizar la consistencia transaccional.
+
+```mermaid
+classDiagram
+    direction TB
+    class Cliente {
+        -UUID id
+        -String nombre
+        -bool activo
+        +activar()
+        +desactivar()
+        +actualizar_perfil()
+    }
+
+    class Email {
+        <<Value Object>>
+        -String direccion
+        +validar_formato()
+    }
+
+    class DocumentoIdentidad {
+        <<Value Object>>
+        -Tipo tipo
+        -String numero
+        +validar()
+    }
+
+    Cliente *-- Email : posee
+    Cliente *-- DocumentoIdentidad : identifica
+```
+
+### Ciclo de Vida de Órdenes (Máquina de Estados)
+Las transiciones de estado de una orden están estrictamente controladas por el dominio.
+
+```mermaid
+stateDiagram-v2
+    [*] --> CREADA : Checkout
+    
+    CREADA --> CONFIRMADA : Pago Exitoso
+    CREADA --> CANCELADA : Cancelar / Pago Fallido
+    
+    CONFIRMADA --> ENVIADA : Despachar
+    CONFIRMADA --> CANCELADA : Cancelar Admin
+    
+    ENVIADA --> ENTREGADA : Confirmar Entrega
+    
+    ENTREGADA --> [*]
+    CANCELADA --> [*]
+
+    note right of CONFIRMADA
+        Reserva de Stock
+        Validación Financiera
+    end note
+```
 
 ---
 
-## 🛠️ Tecnologías Base
+## 💾 Persistencia de Datos
 
-| Componente | Tecnología | Versión | Propósito |
-|---|---|---|---|
-| **Lenguaje** | Python | 3.14+ | Lógica principal y tipado |
-| **Framework** | Django | 6.0 | ORM, Panel de Admin, Migraciones |
-| **API** | FastAPI | 0.128 | API REST Async de alto rendimiento |
-| **Base de Datos** | PostgreSQL | 18.1 | Almacenamiento de Datos (Desacoplado por repositorios) |
-| **Linting** | Black / Flake8 | Latest | Calidad de código y formato |
+Esquema físico optimizado en PostgreSQL, gestionado vía migraciones de Django pero desacoplado del dominio.
+
+```mermaid
+erDiagram
+    CLIENTES ||--o{ ORDENES : realiza
+    ORDENES ||--|{ LINEAS : contiene
+    PRODUCTOS ||--o{ LINEAS : referencia
+
+    CLIENTES {
+        uuid id PK
+        string email UK
+        string documento
+    }
+    ORDENES {
+        uuid id PK
+        decimal total
+        enum estado
+    }
+    PRODUCTOS {
+        uuid id PK
+        string sku UK
+        int stock
+    }
+```
 
 ---
 
-## 📂 Estructura del Proyecto
+## 🛠️ Stack Tecnológico
 
+| Capa | Tecnología | Rol Principal |
+|---|---|---|
+| **Dominio** | Python Puro | Reglas de negocio, Entidades, VO |
+| **Aplicación** | Python Libs | Casos de uso, DTOs, Validaciones |
+| **Infraestructura** | **Django 6.0** | ORM, Admin Panel, Auth, Migraciones |
+| **Interface API** | **FastAPI** | Endpoints Async de alto rendimiento, Swagger UI |
+| **Base de Datos** | **PostgreSQL 18** | Persistencia relacional robusta |
+| **Testing** | PyTest | Pruebas unitarias y de integración |
+
+---
+
+## 🚀 Instalación y Ejecución
+
+### 1. Preparar Entorno
 ```bash
-src/
-├── domain/                  # 🧠 LÓGICA DE NEGOCIO (Python Puro)
-│   ├── entities/            # Objetos de Negocio (Cliente, Producto, Orden)
-│   ├── value_objects/       # Atributos inmutables (Email, Dinero)
-│   ├── repositories/        # Interfaces solamente!
-│   └── events/              # Eventos de Dominio
-│
-├── application/             # 💼 ORQUESTACIÓN
-│   ├── use_cases/           # Reglas de negocio específicas de la aplicación
-│   └── dto/                 # Contratos de datos
-│
-├── infrastructure/          # 🔌 ADAPTADORES & IO
-│   ├── persistence/         # Implementación de Repositorios (Django ORM)
-│   ├── logging/             # Adaptadores de logging
-│   └── config/              # Configuraciones del Framework
-│
-├── interfaces/              # 🗣️ MECANISMOS DE ENTREGA
-│   ├── api/                 # Rutas FastAPI
-│   └── management/          # Comandos CLI
-│
-└── shared/                  # 🔗 COMPONENTES COMPARTIDOS
-    ├── exceptions/          # Excepciones base
-    └── utils/               # Utilidades generales
+git clone <repo-url>
+cd e-comerce
+python -m venv venv
+# Activar: venv\Scripts\activate (Windows) o source venv/bin/activate (Linux)
 ```
 
----
-
-## 💻 Comenzando
-
-### Prerrequisitos
-*   Python 3.14+
-*   PostgreSQL
-
-### Instalación
-
-1.  **Clonar el repositorio**
-    ```bash
-    git clone https://github.com/tu-repo/ecommerce.git
-    cd ecommerce
-    ```
-
-2.  **Crear Entorno Virtual**
-    ```bash
-    python -m venv venv
-    # Windows:
-    .\venv\Scripts\activate
-    # Linux/Mac:
-    source venv/bin/activate
-    ```
-
-3.  **Instalar Dependencias**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  **Configuración**
-    Copia el archivo de ejemplo y actualiza tus credenciales de BD:
-    ```bash
-    cp .env.example .env
-    ```
-
-5.  **Ejecutar Migraciones**
-    ```bash
-    python manage.py migrate
-    ```
-
-6.  **Ejecutar Servidor de Desarrollo**
-    *   **Django (Admin/Comandos)**: `python manage.py runserver`
-    *   **FastAPI (API)**: `uvicorn src.main:app --reload`
-
----
-
-## 🧪 Pruebas
-
-Usamos `pytest` para pruebas exhaustivas.
-
+### 2. Dependencias
 ```bash
-# Ejecutar todas las pruebas
-pytest
+pip install -r requirements.txt
+```
 
-# Ejecutar solo pruebas de dominio (Rápidas, sin BD)
-pytest tests/domain/
+### 3. Configuración
+Crea un archivo `.env` basado en `.env.example` con tus credenciales de PostgreSQL.
 
-# Ejecutar con cobertura
-pytest --cov=src --cov-report=html
+### 4. Ejecución
+```bash
+# Migrar base de datos
+python manage.py migrate
+
+# Iniciar servidor (Híbrido Django + FastAPI)
+python manage.py runserver
 ```
 
 ---
-
-## 📚 Documentación y UML
-
-Este proyecto mantiene diagramas UML detallados para visualizar la arquitectura.
-Ver [**docs/UML_DIAGRAMS.md**](docs/UML_DIAGRAMS.md) para:
-*   Diagramas de Clases (Relaciones de dominio)
-*   Diagramas de Secuencia (Flujo de peticiones)
-*   Diagramas ER (Esquema de Base de Datos)
-
----
-
 <div align="center">
-    <sub>Construido con ❤️ usando principios de Clean Architecture.</sub>
+    <sub>Diseñado con altos estándares de calidad de software.</sub>
 </div>
